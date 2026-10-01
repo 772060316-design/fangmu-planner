@@ -2258,7 +2258,7 @@ async function canvasToPngBlob(canvas) {
         settled = true
         resolve(value)
       }
-      const timer = window.setTimeout(() => finish(null), 1800)
+      const timer = window.setTimeout(() => finish(null), 10000)
       try {
         canvas.toBlob(value => {
           window.clearTimeout(timer)
@@ -2289,15 +2289,18 @@ function showDownloadFallback(dataUrl, filename) {
   return link
 }
 
-function downloadCanvasPng(canvas, filename) {
-  const dataUrl = canvas.toDataURL('image/png')
+async function downloadCanvasPng(canvas, filename) {
+  const blob = await canvasToPngBlob(canvas)
+  if (!blob) throw new Error('图片文件生成失败')
+  const downloadUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.download = filename
-  link.href = dataUrl
+  link.href = downloadUrl
   document.body.appendChild(link)
   link.click()
   link.remove()
-  showDownloadFallback(dataUrl, filename)
+  showDownloadFallback(downloadUrl, filename)
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 300000)
   return true
 }
 
@@ -2324,7 +2327,7 @@ async function saveReportImages(triggerButton) {
       useCORS: true,
     })
     const filename = `方木-${modeName}-${state.studentWechat || '学员'}.png`
-    downloadCanvasPng(canvas, filename)
+    await downloadCanvasPng(canvas, filename)
     if (triggerButton) {
       triggerButton.textContent = '已保存'
       window.setTimeout(() => {
@@ -2385,7 +2388,7 @@ async function saveAllReportImages(triggerButton) {
         backgroundColor: '#f6f7f4',
         useCORS: true,
       })
-      downloadCanvasPng(canvas, `方木-${modeName}-${state.studentWechat || '学员'}.png`)
+      await downloadCanvasPng(canvas, `方木-${modeName}-${state.studentWechat || '学员'}.png`)
       await new Promise(resolve => setTimeout(resolve, 250))
     }
     state.reportMode = originalMode
