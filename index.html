@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>方木的计划生成</title>
+  <link rel="stylesheet" href="./styles.css?v=20260928-01">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Fangmu Fitness Planner</p>
+        <h1>方木的计划生成</h1>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="页面导航">
+      <button class="tab active" data-tab="client"><img src="../images/tab_client_active.svg" alt="">客户</button>
+      <button class="tab" data-tab="meal"><img src="../images/tab_meal.svg" alt="">饮食</button>
+      <button class="tab" data-tab="train"><img src="../images/tab_train.svg" alt="">训练</button>
+      <button class="tab" data-tab="report"><img src="../images/tab_report.svg" alt="">方案</button>
+    </nav>
+
+    <main>
+      <section class="view active" id="clientView">
+        <div class="grid two">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>客户信息</h2>
+              <div class="panel-actions">
+                <button class="soft-btn" id="fangmuPresetBtn">方木本人</button>
+                <button class="ghost-btn" id="copyTemplateBtn">复制问卷模板</button>
+              </div>
+            </div>
+
+            <label class="field full">
+              <span>粘贴客户信息</span>
+              <textarea id="importText" rows="7" placeholder="把客户填写的问卷粘贴到这里，可自动识别性别、年龄、身高、体重、训练场地和饮食模式。"></textarea>
+            </label>
+            <button class="soft-btn full" id="importBtn">粘贴内容导入</button>
+
+            <div class="segmented" data-bind="gender">
+              <button data-value="male" class="active">男</button>
+              <button data-value="female">女</button>
+            </div>
+
+            <h3>执行方式</h3>
+            <div class="mode-bar"><strong>精准称重 / 估算执行</strong><span>同一套方案</span></div>
+
+            <div class="form-grid">
+              <label class="field">
+                <span>年龄</span>
+                <input id="age" type="number" min="1" max="120" placeholder="28">
+              </label>
+              <label class="field">
+                <span>身高 cm</span>
+                <input id="height" type="text" inputmode="decimal" min="1" max="250" placeholder="175">
+              </label>
+              <label class="field">
+                <span>体重 kg</span>
+                <input id="weight" type="text" inputmode="decimal" min="1" max="500" placeholder="72">
+              </label>
+            </div>
+
+            <h3>每周训练次数</h3>
+            <div class="choice-grid compact short-choice-grid" id="activityChoices"></div>
+            <p class="choice-summary" id="activitySummary"></p>
+
+            <h3>训练年限</h3>
+            <div class="choice-grid compact short-choice-grid" id="trainingAgeChoices"></div>
+            <p class="choice-summary" id="trainingAgeSummary"></p>
+
+            <h3>自动减脂缺口</h3>
+            <p class="choice-summary" id="goalSummary">填写身高、体重后，按 BMI 自动设置</p>
+
+            <button class="primary-btn full" id="calculateBtn">计算 BMI 并生成方案</button>
+          </div>
+
+          <aside class="panel result-panel" id="resultPanel">
+            <p class="eyebrow">计算结果</p>
+            <div class="hero-number">
+              <span id="targetCalories">--</span>
+              <small>kcal / 天</small>
+            </div>
+            <div class="metrics">
+              <div><strong id="bmr">--</strong><span>基础代谢</span></div>
+              <div><strong id="tdee">--</strong><span>每日消耗</span></div>
+              <div><strong id="deficit">--</strong><span>热量盈亏</span></div>
+            </div>
+            <div class="macro-cards">
+              <div class="macro-card carb"><strong id="carbs">--g</strong><span>碳水</span></div>
+              <div class="macro-card prot"><strong id="protein">--g</strong><span>蛋白质</span></div>
+              <div class="macro-card fat"><strong id="fat">--g</strong><span>脂肪</span></div>
+            </div>
+            <p class="protein-note" id="proteinNote">先锁蛋白，再用维持热量做523基准；减脂缺口从碳水和少量脂肪里扣。</p>
+            <div class="meal-strategy" id="mealStrategy">
+              <div>
+                <span>餐数建议</span>
+                <strong>先计算</strong>
+              </div>
+              <p>算出蛋白后，再判断是否需要睡前餐。</p>
+              <div class="choice-grid compact" id="mealCountChoices"></div>
+            </div>
+            <div class="forecast">
+              <span>1个月预估 <b id="forecast1m">--</b></span>
+              <span>3个月预估 <b id="forecast3m">--</b></span>
+            </div>
+            <button class="primary-btn full" id="generateMealBtn">一键生成饮食</button>
+            <button class="soft-btn full" data-jump="meal">下一步：去配餐</button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="mealView">
+        <div class="panel meal-mode-top">
+          <div class="mode-bar"><strong>精准称重 / 估算执行</strong><span>同一套方案</span></div>
+          <div class="oil-control" id="oilField">
+            <label class="field">
+              <span>外食估计油脂 g/天</span>
+              <input id="oilGrams" type="number" min="0" step="1" value="" placeholder="不填">
+            </label>
+            <small class="oil-hint" id="oilHint">当前未预设油脂；需要时在餐内搜索“食用油 / 橄榄油”后自行添加。</small>
+          </div>
+        </div>
+
+        <div class="panel target-card calorie-card">
+          <p class="eyebrow">热量</p>
+          <div class="target-row">
+            <strong id="mealTarget">请先计算</strong>
+            <span id="mealTotal">已配 0 kcal</span>
+          </div>
+          <div class="progress"><i id="calProgress"></i></div>
+        </div>
+
+        <div class="macro-square-grid">
+          <div class="macro-square carb">
+            <div><span>碳水 当前/目标</span><strong id="carbProgressText">0/0g</strong></div>
+            <div class="macro-mini-progress"><i id="carbMacroBar"></i></div>
+          </div>
+          <div class="macro-square prot">
+            <div><span>蛋白 当前/目标</span><strong id="proteinProgressText">0/0g</strong></div>
+            <div class="macro-mini-progress"><i id="proteinMacroBar"></i></div>
+          </div>
+          <div class="macro-square fat">
+            <div><span>脂肪 当前/目标</span><strong id="fatProgressText">0/0g</strong></div>
+            <div class="macro-mini-progress"><i id="fatMacroBar"></i></div>
+          </div>
+        </div>
+
+        <div class="panel diet-audit">
+          <div class="panel-head">
+            <h2>膳食指南检测</h2>
+            <span class="audit-source">亮色达标，暗色待补</span>
+          </div>
+          <div class="audit-grid" id="dietAuditGrid"></div>
+        </div>
+
+        <div class="meal-layout">
+          <div class="meal-list" id="mealList"></div>
+        </div>
+
+        <div class="action-row">
+          <button class="primary-btn" id="saveMealPlanBtn">保存当前饮食</button>
+          <button class="ghost-btn" id="resetMealBtn">重新生成默认饮食</button>
+          <button class="ghost-btn danger" id="clearMealBtn">清空配餐</button>
+          <button class="primary-btn" data-jump="train">下一步：训练</button>
+        </div>
+      </section>
+
+      <section class="view" id="trainView">
+        <div class="train-layout">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>训练模板</h2>
+              <button class="ghost-btn" id="resetTrainBtn">恢复默认</button>
+            </div>
+            <div class="segmented" data-bind="venue">
+              <button data-value="gym" class="active">健身房</button>
+              <button data-value="home">居家</button>
+            </div>
+            <div class="segmented" data-bind="trainGender">
+              <button data-value="male" class="active">男</button>
+              <button data-value="female">女</button>
+            </div>
+            <div class="form-grid">
+              <label class="field">
+                <span>有氧次数 / 周</span>
+                <output id="cardioPerWeek" class="fixed-field-value">3次</output>
+              </label>
+              <label class="field">
+                <span>每次分钟</span>
+                <input id="cardioDuration" type="number" min="0">
+              </label>
+              <label class="field">
+                <span>有氧方式</span>
+                <input id="cardioType" type="text" placeholder="爬坡/快走">
+              </label>
+            </div>
+            <div class="note-card" id="cardioRecommend">填写年龄后自动生成心率建议</div>
+          </div>
+
+          <div class="train-days" id="trainDays"></div>
+
+          <aside class="panel exercise-panel">
+            <h2>添加动作</h2>
+            <label class="field full">
+              <span>添加到</span>
+              <select id="targetDaySelect"></select>
+            </label>
+            <label class="field full">
+              <span>搜索</span>
+              <input id="exerciseSearch" type="search" placeholder="输入动作名称后添加">
+            </label>
+            <div id="exerciseLibrary"></div>
+          </aside>
+        </div>
+        <div class="action-row">
+          <button class="primary-btn" data-jump="report">生成方案预览</button>
+        </div>
+      </section>
+
+      <section class="view" id="reportView">
+        <div class="report-actions panel">
+          <label class="field">
+            <span>学员名</span>
+          <input id="studentWechat" placeholder="例如：小王">
+          </label>
+          <button class="primary-btn" data-export-mode="diet">保存饮食</button>
+          <button class="primary-btn" data-export-mode="train">保存训练</button>
+          <button class="primary-btn" data-export-mode="bmi">保存 BMI 建议</button>
+          <button class="primary-btn" id="exportAllBtn">保存三页</button>
+          <p class="save-status" id="saveStatus" aria-live="polite"></p>
+        </div>
+        <article class="report-sheet" id="reportSheet"></article>
+      </section>
+    </main>
+  </div>
+
+    <script src="./vendor/html2canvas.min.js?v=20260916-01"></script>
+  <script src="./app.js?v=20260929-01"></script>
+</body>
+</html>
