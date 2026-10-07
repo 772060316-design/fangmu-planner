@@ -71,8 +71,8 @@
             <div class="choice-grid compact short-choice-grid" id="trainingAgeChoices"></div>
             <p class="choice-summary" id="trainingAgeSummary"></p>
 
-            <h3>自动减脂缺口</h3>
-            <p class="choice-summary" id="goalSummary">填写身高、体重后，按 BMI 自动设置</p>
+            <h3>减脂缺口</h3>
+            <p class="choice-summary" id="goalSummary">统一按每日 600 kcal 缺口计算</p>
 
             <button class="primary-btn full" id="calculateBtn">计算 BMI 并生成方案</button>
           </div>
@@ -93,7 +93,7 @@
               <div class="macro-card prot"><strong id="protein">--g</strong><span>蛋白质</span></div>
               <div class="macro-card fat"><strong id="fat">--g</strong><span>脂肪</span></div>
             </div>
-            <p class="protein-note" id="proteinNote">先锁蛋白，再用维持热量做523基准；减脂缺口从碳水和少量脂肪里扣。</p>
+            <p class="protein-note" id="proteinNote">先锁基础蛋白，剩余热量按碳水/脂肪 5:3 分；再将原碳水的10%等热量转给蛋白质。</p>
             <div class="meal-strategy" id="mealStrategy">
               <div>
                 <span>餐数建议</span>
@@ -237,7 +237,7 @@
     </main>
   </div>
 
-    <script src="./vendor/html2canvas.min.js?v=20261001-01"></script>
-  <script src="./app.js?v=20261001-01"></script>
+    <script src="./vendor/html2canvas.min.js?v=20261007-01"></script>
+  <script src="./app.js?v=20261007-01"></script>
 </body>
 </html>

@@ -91,15 +91,14 @@ const activityLevels = [
   { label: '5练', desc: '训练系数 ×1.50', factor: 1.50 },
 ]
 
+const targetCalorieDeficit = 600
 const goals = [
-  { label: '减脂300卡', desc: '每日缺口300kcal', deficit: 300 },
-  { label: '减脂350卡', desc: '每日缺口350kcal', deficit: 350 },
-  { label: '减脂400卡', desc: '每日缺口400kcal', deficit: 400 },
+  { label: '减脂600卡', desc: '每日缺口600kcal', deficit: targetCalorieDeficit },
 ]
 
-function cardioSessionsForDeficit(deficit) {
-  if (Number(deficit) >= 400) return 5
-  if (Number(deficit) >= 350) return 4
+function cardioSessionsForBmi(bmi) {
+  if (Number(bmi) > 28) return 5
+  if (Number(bmi) >= 24) return 4
   return 3
 }
 
@@ -173,7 +172,7 @@ const mealSearchTerms = {}
 function defaultState() {
   return {
     activeTab: 'client',
-    client: { gender: 'female', age: '', height: '', weight: '', activityIndex: 1, trainingAgeIndex: 0, goalIndex: 1, mealCountIndex: 0 },
+    client: { gender: 'female', age: '', height: '', weight: '', activityIndex: 1, trainingAgeIndex: 0, goalIndex: 0, mealCountIndex: 0 },
     result: null,
     mealMode: 'gram',
     dietPreferences: { noWhey: false, selfCook: false },
@@ -200,7 +199,7 @@ function normalizeState(raw) {
   if (next.client.trainingAgeIndex >= trainingAges.length) next.client.trainingAgeIndex = 0
   if (next.client.mealCountIndex === undefined) next.client.mealCountIndex = 0
   if (next.client.mealCountIndex >= mealCountOptions.length) next.client.mealCountIndex = 0
-  if (next.client.goalIndex >= goals.length) next.client.goalIndex = 1
+  if (next.client.goalIndex >= goals.length) next.client.goalIndex = 0
   if (!Array.isArray(next.meals) || next.meals.length !== getMealCount(next)) next.meals = emptyMeals(getMealCount(next))
   if (!next.savedMealPlan || !Array.isArray(next.savedMealPlan.meals)) next.savedMealPlan = null
   if (next.train && (!next.train.cardioType || next.train.cardioType === '快走/椭圆机')) next.train.cardioType = '爬坡/快走'
@@ -211,8 +210,9 @@ function normalizeState(raw) {
     next.train.cardioType = '爬坡/快走'
     next.cardioDefaultVersion = 2
   }
-  if (next.result && (next.result.selectedDeficit || next.result.deficit)) {
-    next.train.cardioPerWeek = cardioSessionsForDeficit(next.result.selectedDeficit || next.result.deficit)
+  if (next.result) {
+    next.result.selectedDeficit = targetCalorieDeficit
+    next.train.cardioPerWeek = cardioSessionsForBmi(getClientBmiFromState(next))
   }
   if (storedTrainTemplateVersion !== trainTemplateVersion) {
     next.train = buildTrainTemplate(next.train?.venue || 'gym', next.train?.gender || next.client.gender)
@@ -602,7 +602,8 @@ function foodChoiceHint(item) {
 }
 
 function calculateMacroTargets(maintenanceCalories, protein, deficit, gender = state.client.gender) {
-  const proteinCal = protein * 4
+  const baseProtein = protein
+  const proteinCal = baseProtein * 4
   const fatFloor = gender === 'female' ? 45 : 40
   const requestedTargetCalories = Math.max(0, Math.round(maintenanceCalories - deficit))
   const remainingCal = Math.max(0, requestedTargetCalories - proteinCal)
@@ -610,10 +611,14 @@ function calculateMacroTargets(maintenanceCalories, protein, deficit, gender = s
   const plannedFatCal = remainingCal * 3 / 8
   const protectedFatCal = Math.max(minFatCal, plannedFatCal)
   const finalCarbCal = Math.max(0, remainingCal - protectedFatCal)
-  const carbs = Math.max(0, Math.round(finalCarbCal / 4))
+  const baseCarbs = Math.max(0, finalCarbCal / 4)
+  const carbTransferToProtein = Math.round(baseCarbs * 0.1)
+  const carbs = Math.max(0, Math.round(baseCarbs - carbTransferToProtein))
+  protein = baseProtein + carbTransferToProtein
   const fat = Math.max(fatFloor, Math.round(protectedFatCal / 9))
-  const targetCalories = Math.round(proteinCal + carbs * 4 + fat * 9)
-  return { carbs, fat, proteinCal, remainingCal, requestedTargetCalories, targetCalories, selectedDeficit: deficit, fatFloor }
+  const calculatedMacroCalories = Math.round(protein * 4 + carbs * 4 + fat * 9)
+  const targetCalories = requestedTargetCalories
+  return { carbs, fat, protein, baseProtein, carbTransferToProtein, proteinCal: protein * 4, remainingCal, requestedTargetCalories, targetCalories, calculatedMacroCalories, selectedDeficit: deficit, fatFloor }
 }
 
 function buildMealProteinStatus(meal, targetProtein, mealCount) {
@@ -1123,7 +1128,7 @@ function clearClientResultDisplay() {
   $('#carbs').textContent = '--g'
   $('#protein').textContent = '--g'
   $('#fat').textContent = '--g'
-  $('#proteinNote').textContent = '先确定目标热量，再锁蛋白；剩余热量按碳水/脂肪 = 5:3 分。'
+  $('#proteinNote').textContent = '先锁基础蛋白，剩余热量按碳水/脂肪 = 5:3 分；再将原碳水的10%等热量转给蛋白质。'
   renderMealStrategy({})
   $('#forecast1m').textContent = '--'
   $('#forecast3m').textContent = '--'
@@ -1190,10 +1195,7 @@ function renderChoices() {
   if (trainingAgeSummary) trainingAgeSummary.textContent = trainingAges[state.client.trainingAgeIndex].desc
   const goalSummary = $('#goalSummary')
   if (goalSummary) {
-    const deficit = getAutomaticDeficit()
-    goalSummary.textContent = deficit
-      ? `根据 BMI 自动设置：每日减脂 ${deficit} kcal`
-      : '填写身高、体重后，按 BMI 自动设置'
+    goalSummary.textContent = `统一设置：每日减脂 ${targetCalorieDeficit} kcal`
   }
 }
 
@@ -1223,8 +1225,8 @@ function renderClient() {
   $('#protein').textContent = result.protein ? result.protein + 'g' : '--g'
   $('#fat').textContent = result.fat ? result.fat + 'g' : '--g'
   $('#proteinNote').textContent = result.protein
-    ? `先确定目标热量 ${result.targetCalories}kcal，再锁蛋白 ${result.protein}g；剩余热量按碳水/脂肪 = 5:3 分。`
-    : '先确定目标热量，再锁蛋白；剩余热量按碳水/脂肪 = 5:3 分。'
+    ? `目标热量 ${result.targetCalories}kcal；基础蛋白锁定后，剩余热量按碳水/脂肪 = 5:3 分，再将原碳水的10%等热量转给蛋白质。`
+    : '先锁基础蛋白，剩余热量按碳水/脂肪 = 5:3 分；再将原碳水的10%等热量转给蛋白质。'
   renderMealStrategy(result)
   $('#forecast1m').textContent = result.forecast1m ? formatForecastText(result.forecast1m, result.pct1m, result.deficit) : '--'
   $('#forecast3m').textContent = result.forecast3m ? formatForecastText(result.forecast3m, result.pct3m, result.deficit) : '--'
@@ -1264,11 +1266,20 @@ function calculate() {
   const bmr = state.client.gender === 'male' ? 10 * w + 6.25 * h - 5 * a + 5 : 10 * w + 6.25 * h - 5 * a - 161
   const tdee = bmr * activityLevels[state.client.activityIndex].factor
   const bmi = round1(w / ((h / 100) ** 2))
-  const goalDeficit = bmi > 28 ? 400 : bmi >= 24 ? 350 : 300
-  state.client.goalIndex = goals.findIndex(goal => goal.deficit === goalDeficit)
-  state.train.cardioPerWeek = cardioSessionsForDeficit(goalDeficit)
+  const goalDeficit = targetCalorieDeficit
+  state.client.goalIndex = 0
+  state.train.cardioPerWeek = cardioSessionsForBmi(bmi)
   const proteinPlan = getProteinRecommendation(w)
-  const protein = proteinPlan.grams
+  const macroTargets = calculateMacroTargets(tdee, proteinPlan.grams, goalDeficit, state.client.gender)
+  const protein = macroTargets.protein
+  proteinPlan.grams = protein
+  proteinPlan.recommendedMealCount = protein / 4 > 40 ? 5 : 4
+  proteinPlan.fourMealAvg = round1(protein / 4)
+  proteinPlan.fiveMealAvg = round1(protein / 5)
+  proteinPlan.sleepMealStatus = proteinPlan.recommendedMealCount === 5 ? '有睡前餐' : '无睡前餐'
+  proteinPlan.mealReason = proteinPlan.recommendedMealCount === 5
+    ? `4餐平均 ${proteinPlan.fourMealAvg}g/餐，超过40g；5餐平均 ${proteinPlan.fiveMealAvg}g/餐，用睡前餐分摊蛋白。`
+    : `4餐平均 ${proteinPlan.fourMealAvg}g/餐，落在30-40g区间；暂时不需要睡前餐。`
   const nextMealCountIndex = getMealCountIndex(proteinPlan.recommendedMealCount)
   if (nextMealCountIndex >= 0 && Number(state.client.mealCountIndex) !== nextMealCountIndex) {
     state.client.mealCountIndex = nextMealCountIndex
@@ -1276,11 +1287,8 @@ function calculate() {
   const selectedMealCount = getMealCount()
   proteinPlan.mealCount = selectedMealCount
   proteinPlan.perMeal = round1(protein / selectedMealCount)
-  const macroTargets = calculateMacroTargets(tdee, protein, goalDeficit, state.client.gender)
-  const calorieFloor = state.client.gender === 'male' ? 1500 : 1200
-  const targetCalories = Math.max(macroTargets.targetCalories, calorieFloor)
-  const floorCarbAdd = Math.max(0, Math.round((targetCalories - macroTargets.targetCalories) / 4))
-  const carbs = macroTargets.carbs + floorCarbAdd
+  const targetCalories = macroTargets.targetCalories
+  const carbs = macroTargets.carbs
   const fat = macroTargets.fat
   const actualDeficit = Math.round(tdee - targetCalories)
   const dailyChangeKg = actualDeficit / 7700
@@ -1591,8 +1599,7 @@ function renderTrain() {
   enforceFixedFemaleTemplate()
   setSegmented('venue', state.train.venue)
   setSegmented('trainGender', state.train.gender)
-  const automaticDeficit = state.result?.selectedDeficit || getAutomaticDeficit() || 300
-  state.train.cardioPerWeek = cardioSessionsForDeficit(automaticDeficit)
+  state.train.cardioPerWeek = cardioSessionsForBmi(getClientBmi())
   $('#cardioPerWeek').textContent = `${state.train.cardioPerWeek}次`
   $('#cardioDuration').value = state.train.cardioDuration ?? ''
   $('#cardioType').value = state.train.cardioType || ''
@@ -2044,10 +2051,15 @@ function getClientBmi() {
   return round1(weight / ((height / 100) ** 2))
 }
 
+function getClientBmiFromState(sourceState) {
+  const height = Number(sourceState?.client?.height) || 0
+  const weight = Number(sourceState?.client?.weight) || 0
+  if (height <= 0 || weight <= 0) return null
+  return round1(weight / ((height / 100) ** 2))
+}
+
 function getAutomaticDeficit() {
-  const bmi = getClientBmi()
-  if (bmi === null) return null
-  return bmi > 28 ? 400 : bmi >= 24 ? 350 : 300
+  return targetCalorieDeficit
 }
 
 function renderBmiPriorityPage(pageWatermark) {
