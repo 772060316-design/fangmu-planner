@@ -71,7 +71,13 @@
             <div class="choice-grid compact short-choice-grid" id="trainingAgeChoices"></div>
             <p class="choice-summary" id="trainingAgeSummary"></p>
 
-            <h3>减脂缺口</h3>
+            <h3>是否吃早餐</h3>
+            <div class="segmented breakfast-choice" data-bind="breakfast">
+              <button data-value="yes" class="active">吃早餐</button>
+              <button data-value="no">不吃早餐</button>
+            </div>
+
+            <h3>自动热量缺口</h3>
             <p class="choice-summary" id="goalSummary">吃早餐按600 kcal缺口，不吃早餐按700 kcal缺口</p>
 
             <button class="primary-btn full" id="calculateBtn">计算 BMI 并生成方案</button>
@@ -97,11 +103,6 @@
             <div class="forecast">
               <span>1个月预估 <b id="forecast1m">--</b></span>
               <span>3个月预估 <b id="forecast3m">--</b></span>
-            </div>
-            <h3>是否吃早餐</h3>
-            <div class="segmented breakfast-choice" data-bind="breakfast">
-              <button data-value="yes" class="active">吃早餐</button>
-              <button data-value="no">不吃早餐</button>
             </div>
             <button class="primary-btn full" id="generateMealBtn">一键生成饮食</button>
             <button class="soft-btn full" data-jump="meal">下一步：去配餐</button>
