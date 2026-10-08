@@ -252,6 +252,22 @@ input:focus, textarea:focus, select:focus { border-color: var(--green-2); box-sh
 
 .segmented button.active { background: #fff; color: var(--green); box-shadow: 0 5px 14px rgba(34,77,45,0.08); }
 
+.breakfast-choice {
+  margin: 8px 0 22px;
+  padding: 6px;
+}
+
+.breakfast-choice button {
+  min-height: 58px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.breakfast-choice button.active {
+  background: var(--green);
+  color: #fff;
+}
+
 .choice-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

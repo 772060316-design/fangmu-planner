@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>方木的计划生成</title>
-  <link rel="stylesheet" href="./styles.css?v=20260928-01">
+  <link rel="stylesheet" href="./styles.css?v=20261008-01">
 </head>
 <body>
   <div class="app-shell">
@@ -47,12 +47,6 @@
 
             <h3>执行方式</h3>
             <div class="mode-bar"><strong>精准称重 / 估算执行</strong><span>同一套方案</span></div>
-
-            <h3>早餐习惯</h3>
-            <div class="segmented" data-bind="breakfast">
-              <button data-value="yes" class="active">吃早餐</button>
-              <button data-value="no">不吃早餐</button>
-            </div>
 
             <div class="form-grid">
               <label class="field">
@@ -100,17 +94,14 @@
               <div class="macro-card fat"><strong id="fat">--g</strong><span>脂肪</span></div>
             </div>
             <p class="protein-note" id="proteinNote">先锁基础蛋白，剩余热量按碳水/脂肪 5:3 分；再将原碳水的10%等热量转给蛋白质。</p>
-            <div class="meal-strategy" id="mealStrategy">
-              <div>
-                <span>餐数建议</span>
-                <strong>先计算</strong>
-              </div>
-              <p>算出蛋白后，再判断是否需要睡前餐。</p>
-              <div class="choice-grid compact" id="mealCountChoices"></div>
-            </div>
             <div class="forecast">
               <span>1个月预估 <b id="forecast1m">--</b></span>
               <span>3个月预估 <b id="forecast3m">--</b></span>
+            </div>
+            <h3>是否吃早餐</h3>
+            <div class="segmented breakfast-choice" data-bind="breakfast">
+              <button data-value="yes" class="active">吃早餐</button>
+              <button data-value="no">不吃早餐</button>
             </div>
             <button class="primary-btn full" id="generateMealBtn">一键生成饮食</button>
             <button class="soft-btn full" data-jump="meal">下一步：去配餐</button>
@@ -244,6 +235,6 @@
   </div>
 
     <script src="./vendor/html2canvas.min.js?v=20261007-01"></script>
-  <script src="./app.js?v=20261007-02"></script>
+  <script src="./app.js?v=20261008-01"></script>
 </body>
 </html>

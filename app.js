@@ -108,11 +108,6 @@ const trainingAges = [
   { label: '两年以上', desc: '蛋白系数 1.8g/kg', factor: 1.8 },
 ]
 
-const mealCountOptions = [
-  { label: '无睡前餐', desc: '只保留主餐和练后餐', count: 4 },
-  { label: '有睡前餐', desc: '额外增加睡前餐', count: 5 },
-]
-
 const exerciseLib = {
   gym: {
     chest: [{ name: '杠铃卧推', reps: '8-12次', sets: 6 }, { name: '哑铃卧推', reps: '8-12次', sets: 5 }, { name: '史密斯平板卧推', reps: '8-12次', sets: 6 }, { name: '史密斯上斜推胸', reps: '8-12次', sets: 5 }, { name: '蝴蝶机夹胸', reps: '8-12次', sets: 5 }, { name: '绳索夹胸', reps: '8-12次', sets: 5 }],
@@ -199,8 +194,7 @@ function normalizeState(raw) {
   if (next.client.activityIndex >= activityLevels.length) next.client.activityIndex = 1
   if (next.client.trainingAgeIndex === undefined) next.client.trainingAgeIndex = 0
   if (next.client.trainingAgeIndex >= trainingAges.length) next.client.trainingAgeIndex = 0
-  if (next.client.mealCountIndex === undefined) next.client.mealCountIndex = 0
-  if (next.client.mealCountIndex >= mealCountOptions.length) next.client.mealCountIndex = 0
+  next.client.mealCountIndex = 0
   if (next.client.goalIndex >= goals.length) next.client.goalIndex = 0
   if (!Array.isArray(next.meals) || next.meals.length !== getActiveMealCount(next)) next.meals = emptyMeals(getMealCount(next), next.client.eatsBreakfast)
   if (!next.savedMealPlan || !Array.isArray(next.savedMealPlan.meals)) next.savedMealPlan = null
@@ -326,16 +320,11 @@ function itemHasTag(item, tag) {
 }
 
 function getMealCount(src = state) {
-  const index = Number(src.client && src.client.mealCountIndex) || 0
-  return (mealCountOptions[index] || mealCountOptions[0]).count
+  return 4
 }
 
 function getActiveMealCount(src = state) {
   return Math.max(1, getMealCount(src) - (src.client?.eatsBreakfast === false ? 1 : 0))
-}
-
-function getMealCountIndex(count) {
-  return mealCountOptions.findIndex(option => option.count === count)
 }
 
 function formatForecastText(weight, pct, deficit) {
@@ -354,15 +343,12 @@ function getProteinRecommendation(weight) {
   const rounded = roundTo10(raw)
   const grams = clamp(rounded, 120, 180)
   const baseActiveMealCount = state.client.eatsBreakfast === false ? 3 : 4
-  const sleepActiveMealCount = baseActiveMealCount + 1
-  const recommendedMealCount = grams / baseActiveMealCount > 40 ? 5 : 4
+  const recommendedMealCount = 4
   const mealCount = getActiveMealCount()
   const fourMealAvg = round1(grams / baseActiveMealCount)
-  const fiveMealAvg = round1(grams / sleepActiveMealCount)
-  const sleepMealStatus = recommendedMealCount === 5 ? '有睡前餐' : '无睡前餐'
-  const mealReason = recommendedMealCount === 5
-    ? `${baseActiveMealCount}餐平均 ${fourMealAvg}g/餐，超过40g；${sleepActiveMealCount}餐平均 ${fiveMealAvg}g/餐，用睡前餐分摊蛋白。`
-    : `${baseActiveMealCount}餐平均 ${fourMealAvg}g/餐，落在30-40g区间；暂时不需要睡前餐。`
+  const fiveMealAvg = fourMealAvg
+  const sleepMealStatus = `${baseActiveMealCount}餐`
+  const mealReason = `全天${baseActiveMealCount}餐，平均约 ${fourMealAvg}g 蛋白质/餐。`
   return {
     grams,
     factor,
@@ -381,17 +367,14 @@ function getProteinRecommendation(weight) {
 function syncMealResultFields(result) {
   if (!result || !result.protein) return result
   const baseActiveMealCount = state.client.eatsBreakfast === false ? 3 : 4
-  const sleepActiveMealCount = baseActiveMealCount + 1
   const fourMealAvg = round1(result.protein / baseActiveMealCount)
-  const fiveMealAvg = round1(result.protein / sleepActiveMealCount)
-  const recommendedMealCount = fourMealAvg > 40 ? 5 : 4
+  const fiveMealAvg = fourMealAvg
+  const recommendedMealCount = 4
   result.recommendedMealCount = recommendedMealCount
   result.fourMealAvg = fourMealAvg
   result.fiveMealAvg = fiveMealAvg
-  result.sleepMealStatus = recommendedMealCount === 5 ? '有睡前餐' : '无睡前餐'
-  result.mealReason = recommendedMealCount === 5
-    ? `${baseActiveMealCount}餐平均 ${fourMealAvg}g/餐，超过40g；${sleepActiveMealCount}餐平均 ${fiveMealAvg}g/餐，用睡前餐分摊蛋白。`
-    : `${baseActiveMealCount}餐平均 ${fourMealAvg}g/餐，落在30-40g区间；暂时不需要睡前餐。`
+  result.sleepMealStatus = `${baseActiveMealCount}餐`
+  result.mealReason = `全天${baseActiveMealCount}餐，平均约 ${fourMealAvg}g 蛋白质/餐。`
   result.mealCount = getActiveMealCount()
   result.proteinPerMeal = round1(result.protein / result.mealCount)
   return result
@@ -404,7 +387,6 @@ function emptyMeals(count = 5, eatsBreakfast = true) {
     { name: '练后餐', icon: '💪', items: [] },
     { name: '晚餐', icon: '🌙', items: [] },
   ]
-  if (Number(count) === 5) meals.push({ name: '睡前餐', icon: '😴', items: [] })
   return meals
 }
 
@@ -978,8 +960,7 @@ function redistributeWithoutBreakfast(meals, plan, pick) {
   totals = totalsForMeals(withoutBreakfast)
   fatGap = round1((Number(plan.fat) || 0) - totals.fat)
   if (fatGap > 3) {
-    const snackMeal = withoutBreakfast.find(meal => meal.name === '睡前餐')
-      || withoutBreakfast.find(meal => meal.name.includes('练后'))
+    const snackMeal = withoutBreakfast.find(meal => meal.name.includes('练后'))
     if (snackMeal) {
       const currentAlmond = snackMeal.items.find(item => item.name === '杏仁')
       const currentAmount = Number(currentAlmond?.amount) || 0
@@ -1071,7 +1052,6 @@ function buildDefaultGramMeals(count = getMealCount(), target = null, gender = '
   if (selfCook) {
     ;[meals[1], meals[3]].forEach(meal => meal.items.push(buildOilItem(12)))
   }
-  if (meals[4]) meals[4].items = [buildFoodItem(pick('无糖酸奶'), 100), buildFoodItem(pick('杏仁'), 5)]
   if (plan && plan.protein && !fixedFemaleDiet) {
     const perMealProtein = plan.protein / count
     const lunchWithoutMeat = totalsForItems(meals[1].items.filter(item => item.name !== '生牛肉')).protein
@@ -1108,11 +1088,6 @@ function buildDefaultGramMeals(count = getMealCount(), target = null, gender = '
   if (plan && plan.fat && !fixedFemaleDiet) {
     const afterOil = totalsForMeals(meals)
     const fatGap = plan.fat - afterOil.fat
-    if (fatGap > 3 && meals[4]) {
-      const currentAlmond = meals[4].items.find(item => item.name === '杏仁')
-      const almondAmount = clamp(Math.round(((currentAlmond ? Number(currentAlmond.amount) : 0) + fatGap / 50.6 * 100) / 5) * 5, 5, 15)
-      upsertMealItem(meals[4], '杏仁', buildFoodItem(pick('杏仁'), almondAmount))
-    }
     let afterFatFoods = totalsForMeals(meals)
     if (plan.fat - afterFatFoods.fat > 8) {
       replaceMealItem(meals[0], '脱脂牛奶(按ml)', buildFoodItem(pick('纯牛奶(按ml)'), 300))
@@ -1213,7 +1188,6 @@ function clearClientResultDisplay() {
   $('#protein').textContent = '--g'
   $('#fat').textContent = '--g'
   $('#proteinNote').textContent = '先锁基础蛋白，剩余热量按碳水/脂肪 = 5:3 分；再将原碳水的10%等热量转给蛋白质。'
-  renderMealStrategy({})
   $('#forecast1m').textContent = '--'
   $('#forecast3m').textContent = '--'
 }
@@ -1264,15 +1238,6 @@ function renderChoices() {
     state.client.trainingAgeIndex = idx
     invalidateResult()
   })
-  renderChoiceGroup('#mealCountChoices', mealCountOptions, state.client.mealCountIndex, idx => {
-    state.client.mealCountIndex = idx
-    if (state.result && state.result.protein) {
-      state.result.mealCount = getActiveMealCount()
-      state.result.proteinPerMeal = round1(state.result.protein / state.result.mealCount)
-    }
-    saveState()
-    renderAll()
-  })
   const activitySummary = $('#activitySummary')
   if (activitySummary) activitySummary.textContent = activityLevels[state.client.activityIndex].desc
   const trainingAgeSummary = $('#trainingAgeSummary')
@@ -1314,24 +1279,8 @@ function renderClient() {
   $('#proteinNote').textContent = result.protein
     ? `目标热量 ${result.targetCalories}kcal；基础蛋白锁定后，剩余热量按碳水/脂肪 = 5:3 分，再将原碳水的10%等热量转给蛋白质。`
     : '先锁基础蛋白，剩余热量按碳水/脂肪 = 5:3 分；再将原碳水的10%等热量转给蛋白质。'
-  renderMealStrategy(result)
   $('#forecast1m').textContent = result.forecast1m ? formatForecastText(result.forecast1m, result.pct1m, result.deficit) : '--'
   $('#forecast3m').textContent = result.forecast3m ? formatForecastText(result.forecast3m, result.pct3m, result.deficit) : '--'
-}
-
-function renderMealStrategy(result) {
-  const box = $('#mealStrategy')
-  if (!box) return
-  const title = $('strong', box)
-  const desc = $('p', box)
-  if (!result.protein) {
-    title.textContent = '先计算'
-    desc.textContent = '算出蛋白后，再判断是否需要睡前餐。'
-    return
-  }
-  const isUsingRecommended = Number(result.mealCount) === Number(result.recommendedMealCount)
-  title.textContent = `${result.sleepMealStatus} · 当前${result.mealCount}餐`
-  desc.textContent = `${result.mealReason}${isUsingRecommended ? '' : ` 当前是手动${result.mealCount}餐，每餐约${result.proteinPerMeal}g。`}`
 }
 
 function calculate() {
@@ -1361,18 +1310,11 @@ function calculate() {
   const protein = macroTargets.protein
   proteinPlan.grams = protein
   const baseActiveMealCount = state.client.eatsBreakfast === false ? 3 : 4
-  const sleepActiveMealCount = baseActiveMealCount + 1
-  proteinPlan.recommendedMealCount = protein / baseActiveMealCount > 40 ? 5 : 4
+  proteinPlan.recommendedMealCount = 4
   proteinPlan.fourMealAvg = round1(protein / baseActiveMealCount)
-  proteinPlan.fiveMealAvg = round1(protein / sleepActiveMealCount)
-  proteinPlan.sleepMealStatus = proteinPlan.recommendedMealCount === 5 ? '有睡前餐' : '无睡前餐'
-  proteinPlan.mealReason = proteinPlan.recommendedMealCount === 5
-    ? `${baseActiveMealCount}餐平均 ${proteinPlan.fourMealAvg}g/餐，超过40g；${sleepActiveMealCount}餐平均 ${proteinPlan.fiveMealAvg}g/餐，用睡前餐分摊蛋白。`
-    : `${baseActiveMealCount}餐平均 ${proteinPlan.fourMealAvg}g/餐，落在30-40g区间；暂时不需要睡前餐。`
-  const nextMealCountIndex = getMealCountIndex(proteinPlan.recommendedMealCount)
-  if (nextMealCountIndex >= 0 && Number(state.client.mealCountIndex) !== nextMealCountIndex) {
-    state.client.mealCountIndex = nextMealCountIndex
-  }
+  proteinPlan.fiveMealAvg = proteinPlan.fourMealAvg
+  proteinPlan.sleepMealStatus = `${baseActiveMealCount}餐`
+  proteinPlan.mealReason = `全天${baseActiveMealCount}餐，平均约 ${proteinPlan.fourMealAvg}g 蛋白质/餐。`
   const selectedMealCount = getActiveMealCount()
   proteinPlan.mealCount = selectedMealCount
   proteinPlan.perMeal = round1(protein / selectedMealCount)
