@@ -1021,6 +1021,66 @@ function trimExcessCarbsIfNeeded(meals, plan, pick) {
   }
 }
 
+function reduceFlexibleCarbCalories(meals, caloriesToReduce, pick) {
+  let remaining = Math.max(0, Number(caloriesToReduce) || 0)
+  const tolerance = 40
+  const candidates = [
+    { meal: '晚餐', names: ['生米', '米饭'], min: 10 },
+    { meal: '午餐', names: ['糙米', '米饭', '红薯'], min: 10 },
+    { meal: '早餐', names: ['蓝莓'], min: 0 },
+    { meal: '早餐', names: ['生燕麦'], min: 20 },
+  ]
+  candidates.forEach(candidate => {
+    if (remaining <= tolerance) return
+    const meal = meals.find(existing => existing.name === candidate.meal)
+    if (!meal) return
+    const item = meal.items.find(existing => candidate.names.includes(existing.name))
+    if (!item) return
+    const food = pick(item.name)
+    const caloriesPer100 = Number(food?.cal) || 0
+    const currentAmount = Number(item.amount) || 0
+    const availableAmount = Math.max(0, currentAmount - candidate.min)
+    if (!caloriesPer100 || !availableAmount) return
+    const requestedAmount = Math.ceil((remaining - tolerance) / caloriesPer100 * 10) * 10
+    const reduceAmount = Math.min(availableAmount, requestedAmount)
+    upsertMealItem(meal, item.name, buildFoodItem(food, currentAmount - reduceAmount))
+    remaining = Math.max(0, remaining - reduceAmount * caloriesPer100 / 100)
+  })
+}
+
+function convergeMealsToFinalTarget(meals, plan, pick) {
+  if (!plan || !plan.targetCalories) return meals
+
+  rebalanceProteinCarbsIfNeeded(meals, plan, pick)
+  trimExcessCarbsIfNeeded(meals, plan, pick)
+  rebalanceProteinCarbsIfNeeded(meals, plan, pick)
+
+  let totals = totalsForMeals(meals)
+  let calorieOver = Math.round(totals.cal - plan.targetCalories)
+  if (calorieOver > 50) {
+    reduceFlexibleCarbCalories(meals, calorieOver, pick)
+  }
+
+  totals = totalsForMeals(meals)
+  calorieOver = Math.round(totals.cal - plan.targetCalories)
+  if (calorieOver > 50) {
+    const postMeal = meals.find(meal => meal.name.includes('练后'))
+    const bananaIndex = postMeal ? postMeal.items.findIndex(item => item.name === '香蕉') : -1
+    if (bananaIndex >= 0) postMeal.items.splice(bananaIndex, 1)
+  }
+
+  totals = totalsForMeals(meals)
+  calorieOver = Math.round(totals.cal - plan.targetCalories)
+  const proteinOver = round1(totals.protein - (Number(plan.protein) || 0))
+  if (calorieOver > 50 && proteinOver > 3) {
+    reduceProteinAcrossMainMeals(meals, Math.min(proteinOver, calorieOver / 4), pick)
+  }
+
+  totals = totalsForMeals(meals)
+  if (plan.targetCalories - totals.cal > 100) topUpCaloriesIfNeeded(meals, plan, pick)
+  return meals
+}
+
 function buildDefaultGramMeals(count = getMealCount(), target = null, gender = 'female', preferences = {}) {
   const pick = name => foods.find(f => f.name === name)
   const plan = target || null
@@ -1105,15 +1165,11 @@ function buildDefaultGramMeals(count = getMealCount(), target = null, gender = '
       replaceMealItem(meals[3], '生牛肉', buildFoodItem(pick('生带皮鸡腿肉'), dinnerAmount))
     }
   }
-  if (!fixedFemaleDiet) {
-    topUpCaloriesIfNeeded(meals, plan, pick)
-    rebalanceProteinCarbsIfNeeded(meals, plan, pick)
-    trimExcessCarbsIfNeeded(meals, plan, pick)
-    rebalanceProteinCarbsIfNeeded(meals, plan, pick)
-  }
-  return state.client.eatsBreakfast === false
+  let generatedMeals = state.client.eatsBreakfast === false
     ? redistributeWithoutBreakfast(meals, plan, pick)
     : meals
+  generatedMeals = convergeMealsToFinalTarget(generatedMeals, plan, pick)
+  return generatedMeals
 }
 
 function resetMeals(options = {}) {
